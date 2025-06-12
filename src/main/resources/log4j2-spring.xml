@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+  <Properties>
+
+    <!-- Spring 설정값 가져오기 -->
+    <Property name="APP_NAME">${spring:application.name:-todo}</Property>
+    <Property name="SPRING_PROFILE">${spring:profiles.active:-local}</Property>
+
+    <!-- 콘솔용 컬러 패턴 - 개발 중 가독성을 위해 -->
+    <Property
+      name="COLOR_PATTERN">[%clr{%d{yyyy-MM-dd HH:mm:ss.SSS}}{faint}][%clr{%5p}][%clr{${sys:PID}}{magenta}] %clr{---}{faint} %clr{[%15.15t]}{faint} %clr{%logger{36}:%L}{cyan} %clr{:}{faint} %m%n
+    </Property>
+
+    <!-- TCP 전송용 JSON 패턴 - Fluent Bit이 바로 파싱할 수 있는 형태 -->
+    <Property
+      name="TCP_JSON_PATTERN">{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}","level":"%p","pid":"${sys:PID}","thread":"%t","logger":"%c{1}","method":"%M","line":"%L","message":"%enc{%m}{JSON}","host":"${hostName}","application":"${APP_NAME}-${SPRING_PROFILE}"}</Property>
+
+    <!-- SQL 쿼리용 특별 JSON 패턴 - p6spy 로그 구조화 -->
+    <Property
+      name="SQL_JSON_PATTERN">{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}","level":"%p","pid":"${sys:PID}","thread":"%t","logger":"sql","method":"%M","line":"%L","message":"%enc{%m}{JSON}","host":"${hostName}","application":"${APP_NAME}-${SPRING_PROFILE}","log_type":"sql_query"}</Property>
+
+    <!-- TCP 전송용 ERROR JSON 패턴 - 스택트레이스 포함 -->
+    <Property
+      name="ERROR_TCP_JSON_PATTERN">{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ}","level":"%p","pid":"${sys:PID}","thread":"%t","logger":"%c{1}","method":"%M","line":"%L","message":"%enc{%m}{JSON}","exception":"%enc{%ex}{JSON}","host":"${hostName}","application":"${APP_NAME}-${SPRING_PROFILE}","log_type":"error"}</Property>
+
+  </Properties>
+
+  <Appenders>
+    <!-- 콘솔 출력 - 개발 중 실시간 확인용 -->
+    <Console name="CONSOLE_APPENDER" target="SYSTEM_OUT">
+      <PatternLayout pattern="${COLOR_PATTERN}"/>
+    </Console>
+
+    <!-- Fluent Bit TCP 전송 - 실시간 로그 수집 (ERROR 제외) -->
+    <Socket name="FLUENT_BIT_TCP"
+            host="localhost"
+            port="24224"
+            protocol="TCP"
+            bufferedIO="false"
+            immediateFlush="true"
+            ignoreExceptions="false">
+      <PatternLayout charset="UTF-8" pattern="${TCP_JSON_PATTERN}%n"/>
+      <!-- ERROR 레벨 제외 - 별도 포트로 전송 -->
+      <ThresholdFilter level="ERROR" onMatch="DENY" onMismatch="ACCEPT"/>
+      <Property name="connectTimeoutMillis">3000</Property>
+      <Property name="reconnectionDelayMillis">1000</Property>
+    </Socket>
+
+    <!-- Fluent Bit TCP 비동기 래퍼 -->
+    <Async name="ASYNC_FLUENT_BIT"
+           bufferSize="8192"
+           shutdownTimeout="3000"
+           includeLocation="true"
+           blocking="false">
+      <AppenderRef ref="FLUENT_BIT_TCP"/>
+      <!-- TCP 전송 실패 시 파일로 백업 -->
+      <AppenderRef ref="MAIN_FILE_APPENDER"/>
+    </Async>
+
+    <!-- SQL 전용 TCP Appender -->
+    <Socket name="SQL_FLUENT_BIT_TCP"
+            host="localhost"
+            port="24225"
+            protocol="TCP"
+            bufferedIO="false"
+            immediateFlush="true"
+            ignoreExceptions="false">
+      <PatternLayout charset="UTF-8" pattern="${SQL_JSON_PATTERN}%n"/>
+      <Property name="connectTimeoutMillis">3000</Property>
+      <Property name="reconnectionDelayMillis">1000</Property>
+    </Socket>
+
+    <!-- SQL 비동기 래퍼 -->
+    <Async name="ASYNC_SQL_FLUENT_BIT"
+           bufferSize="4096"
+           shutdownTimeout="3000"
+           includeLocation="false">
+      <AppenderRef ref="SQL_FLUENT_BIT_TCP"/>
+      <AppenderRef ref="MAIN_FILE_APPENDER"/>
+    </Async>
+
+    <!-- ERROR 전용 TCP Appender -->
+    <Socket name="ERROR_FLUENT_BIT_TCP"
+            host="localhost"
+            port="24226"
+            protocol="TCP"
+            bufferedIO="false"
+            immediateFlush="true"
+            ignoreExceptions="true">
+      <PatternLayout charset="UTF-8" pattern="${ERROR_TCP_JSON_PATTERN}%n"/>
+      <Property name="connectTimeoutMillis">3000</Property>
+      <Property name="reconnectionDelayMillis">1000</Property>
+      <ThresholdFilter level="ERROR" onMatch="ACCEPT" onMismatch="DENY"/>
+    </Socket>
+
+    <!-- ERROR 비동기 래퍼 -->
+    <Async name="ASYNC_ERROR_FLUENT_BIT"
+           bufferSize="2048"
+           shutdownTimeout="3000"
+           includeLocation="true"
+           blocking="false">
+      <AppenderRef ref="ERROR_FLUENT_BIT_TCP"/>
+      <AppenderRef ref="ERROR_FILE_APPENDER"/>
+    </Async>
+
+  </Appenders>
+
+  <Loggers>
+    <!-- HTTP 요청/응답 로그 -->
+    <Logger name="HttpReqResLoggingFilter" level="INFO" additivity="false">
+      <AppenderRef ref="CONSOLE_APPENDER"/>
+      <AppenderRef ref="ASYNC_FLUENT_BIT"/>
+    </Logger>
+
+    <!-- p6spy SQL 로그 -->
+    <Logger name="p6spy" level="INFO" additivity="false">
+      <AppenderRef ref="CONSOLE_APPENDER"/>
+      <AppenderRef ref="ASYNC_SQL_FLUENT_BIT"/>
+    </Logger>
+
+    <!-- JPA/Hibernate SQL 로그 -->
+    <Logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+      <AppenderRef ref="CONSOLE_APPENDER"/>
+      <AppenderRef ref="ASYNC_SQL_FLUENT_BIT"/>
+    </Logger>
+
+    <!-- JPA 파라미터 바인딩 로그 -->
+    <Logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" additivity="false">
+      <AppenderRef ref="CONSOLE_APPENDER"/>
+      <AppenderRef ref="ASYNC_SQL_FLUENT_BIT"/>
+    </Logger>
+
+    <!-- 데이터베이스 로그 -->
+    <Logger name="database" level="DEBUG" additivity="false">
+      <AppenderRef ref="CONSOLE_APPENDER"/>
+      <AppenderRef ref="ASYNC_FLUENT_BIT"/>
+      <AppenderRef ref="MAIN_FILE_APPENDER"/>
+    </Logger>
+
+    <!-- 외부 라이브러리 로그 레벨 조정 -->
+    <Logger name="org.springframework" level="WARN"/>
+    <Logger name="org.apache.http" level="WARN"/>
+    <Logger name="org.hibernate" level="WARN"/>
+    <Logger name="com.zaxxer.hikari" level="WARN"/>
+
+    <!-- 루트 로거 -->
+    <Root level="INFO" additivity="false">
+      <AppenderRef ref="CONSOLE_APPENDER"/>
+      <AppenderRef ref="ASYNC_FLUENT_BIT"/>
+      <AppenderRef ref="JSON_FILE_APPENDER"/>
+      <AppenderRef ref="ASYNC_ERROR_FLUENT_BIT"/>
+    </Root>
+  </Loggers>
+</Configuration>

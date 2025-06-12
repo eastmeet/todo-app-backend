@@ -3,6 +3,7 @@ package simple.todo.app;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/todo")
 @CrossOrigin(origins = "http://localhost:3000")
+@Slf4j
 public class TodoController {
 
     private final TodoRepository todoRepository;
@@ -55,4 +57,8 @@ public class TodoController {
         return ResponseEntity.notFound().build();
     }
 
+    @GetMapping("/error")
+    public ResponseEntity<Void> createRuntimeError() {
+        throw new RuntimeException("This is a test");
+    }
 }

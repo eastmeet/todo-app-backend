@@ -3,13 +3,9 @@ server:
   shutdown: graceful
 
 logging:
-  config: classpath:log4j2-spring-local.xml
+  config: classpath:log4j2-spring.xml
 
 spring:
-
-  application:
-    name: todo
-
   datasource:
     driver-class-name: org.h2.Driver
     url: jdbc:h2:mem:testdb
@@ -35,5 +31,4 @@ decorator:
     p6spy:
       enable-logging: true
       multiline: true
-      logging: slf4j
 
