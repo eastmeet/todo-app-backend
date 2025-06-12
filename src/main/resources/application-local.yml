@@ -31,4 +31,5 @@ decorator:
     p6spy:
       enable-logging: true
       multiline: true
+      logging: slf4j
 

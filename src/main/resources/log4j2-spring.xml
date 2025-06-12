@@ -147,7 +147,6 @@
     <Root level="INFO" additivity="false">
       <AppenderRef ref="CONSOLE_APPENDER"/>
       <AppenderRef ref="ASYNC_FLUENT_BIT"/>
-      <AppenderRef ref="JSON_FILE_APPENDER"/>
       <AppenderRef ref="ASYNC_ERROR_FLUENT_BIT"/>
     </Root>
   </Loggers>

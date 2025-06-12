@@ -1,6 +1,5 @@
 services:
   elasticsearch:
-    # 최신 Elasticsearch 8.x 버전 (Fluent Bit 4.x와 호환성 확인)
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: elasticsearch
     environment:
@@ -20,8 +19,8 @@ services:
       - elastic
     ulimits:
       memlock:
-        soft: -1
-        hard: -1
+        soft: -1 # 소프트 리미트: 무제한
+        hard: -1 # 하드 리미트: 무제한
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -43,7 +42,6 @@ services:
     volumes:
       # Fluent Bit 핵심 설정 파일들
       - ./fluent-bit/conf/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
-      - ./fluent-bit/conf/parsers.conf:/fluent-bit/etc/parsers.conf:ro
     environment:
       # TCP 기반 로그 수집에 최적화된 환경변수들
       - FLB_LOG_LEVEL=info
