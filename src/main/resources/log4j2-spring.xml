@@ -118,25 +118,6 @@
       <AppenderRef ref="ASYNC_SQL_FLUENT_BIT"/>
     </Logger>
 
-    <!-- JPA/Hibernate SQL 로그 -->
-    <Logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
-      <AppenderRef ref="CONSOLE_APPENDER"/>
-      <AppenderRef ref="ASYNC_SQL_FLUENT_BIT"/>
-    </Logger>
-
-    <!-- JPA 파라미터 바인딩 로그 -->
-    <Logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE" additivity="false">
-      <AppenderRef ref="CONSOLE_APPENDER"/>
-      <AppenderRef ref="ASYNC_SQL_FLUENT_BIT"/>
-    </Logger>
-
-    <!-- 데이터베이스 로그 -->
-    <Logger name="database" level="DEBUG" additivity="false">
-      <AppenderRef ref="CONSOLE_APPENDER"/>
-      <AppenderRef ref="ASYNC_FLUENT_BIT"/>
-      <AppenderRef ref="MAIN_FILE_APPENDER"/>
-    </Logger>
-
     <!-- 외부 라이브러리 로그 레벨 조정 -->
     <Logger name="org.springframework" level="WARN"/>
     <Logger name="org.apache.http" level="WARN"/>
