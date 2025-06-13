@@ -35,10 +35,6 @@ services:
       - "2020:2020"
       # TCP 로그 수신 포트 (HTTP 로그)
       - "24224:24224"
-      # SQL 로그 수신 포트
-      - "24225:24225"
-      # ERROR 로그 수신 포트 추가
-      - "24226:24226"
     volumes:
       # Fluent Bit 핵심 설정 파일들
       - ./fluent-bit/conf/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro

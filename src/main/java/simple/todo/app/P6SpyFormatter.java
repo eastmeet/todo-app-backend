@@ -18,11 +18,10 @@ public class P6SpyFormatter implements MessageFormattingStrategy {
 
     @Override
     public String formatMessage(int connectionId, String now, long elapsed, String category, String prepared, String sql, String url) {
-        String repositoryMethod = findRepositoryMethod();
         String formattedSql = formatSql(category, sql);
 
-        return String.format("[%s] | %d ms | Repository: %s | %s",
-            category, elapsed, repositoryMethod, formattedSql);
+        return String.format("[%s] | %d ms | %s",
+            category, elapsed, formattedSql);
     }
 
     private String formatSql(String category, String sql) {
@@ -36,36 +35,5 @@ public class P6SpyFormatter implements MessageFormattingStrategy {
             return sql;
         }
         return sql;
-    }
-
-    private String findRepositoryMethod() {
-        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-
-        // 더 정확한 Repository 메서드 찾기
-        for (StackTraceElement element : stack) {
-            String className = element.getClassName();
-            String methodName = element.getMethodName();
-
-            // Repository 패턴들을 확인
-            if (className.contains("Repository") ||
-                className.contains("repository") ||
-                className.endsWith("Repo")) {
-
-                // 클래스명을 간단하게 변환
-                String simpleName = className.substring(className.lastIndexOf('.') + 1);
-                return simpleName + "." + methodName + "()";
-            }
-        }
-
-        // JPA Repository 호출 패턴도 확인
-        for (StackTraceElement element : stack) {
-            String className = element.getClassName();
-            if (className.contains("jpa") || className.contains("data")) {
-                String simpleName = className.substring(className.lastIndexOf('.') + 1);
-                return "JPA." + simpleName + "." + element.getMethodName() + "()";
-            }
-        }
-
-        return "unknown";
     }
 }

@@ -1,5 +1,8 @@
 package simple.todo.app;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micrometer.common.util.StringUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -39,6 +42,15 @@ public class HttpReqResLoggingFilter extends OncePerRequestFilter {
     public static final String EXCEPT_STRING_FOR_SECURITY_TOKEN = "token";
     public static final String REPLACEMENT_STRING_FOR_SECURITY = "*****";
 
+    // JSON Pretty Print를 위한 ObjectMapper
+    private final ObjectMapper prettyObjectMapper;
+
+    public HttpReqResLoggingFilter() {
+        this.prettyObjectMapper = new ObjectMapper()
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+    }
+
     /**
      * Http Logging Filter
      *
@@ -65,36 +77,93 @@ public class HttpReqResLoggingFilter extends OncePerRequestFilter {
         filterChain.doFilter(requestWrapper, responseWrapper);
         double processTime = (System.currentTimeMillis() - start) / 1000.0;
         String decodeURL = URLDecoder.decode(request.getRequestURI(), StandardCharsets.UTF_8);
+
         try {
-            log.info("""
-                    ##### HTTP Logging #####
-                    [REQUEST]
-                      • API: ({}) {}
-                      • Headers : {}
-                      • Request IP : {}
-                      • Request Params: {}
-                      • Request Body: {}
-                    [RESPONSE]
-                      • Response Body: {}
-                    [RESULT]
-                      • status: {}
-                      • process time: {}s
-                    """
-                , request.getMethod()
-                , decodeURL
-                , getHeaders(request)
-                , getClientIP(request)
-                , requestWrapper.getQueryString()
-                , getRequestBody(requestWrapper)
-                , getResponseBody(responseWrapper, request)
-                , responseWrapper.getStatus()
-                , processTime
-            );
+            // Pretty formatted 로그 메시지 생성
+            StringBuilder logMessage = new StringBuilder();
+            logMessage.append("##### HTTP Logging #####\n");
+            logMessage.append("[REQUEST]\n");
+            logMessage.append("  • API: (").append(request.getMethod()).append(") ").append(decodeURL).append("\n");
+
+            // Headers를 JSON으로 pretty print
+            Map<String, String> headers = getHeaders(request);
+            if (!headers.isEmpty()) {
+                logMessage.append("  • Headers:\n").append(toPrettyJson(headers)).append("\n");
+            }
+
+            logMessage.append("  • Request IP: ").append(getClientIP(request)).append("\n");
+
+            // Request Params
+            String queryString = requestWrapper.getQueryString();
+            if (queryString != null) {
+                logMessage.append("  • Request Params: ").append(queryString).append("\n");
+            } else {
+                logMessage.append("  • Request Params: null\n");
+            }
+
+            // Request Body를 JSON으로 pretty print
+            String requestBody = getRequestBody(requestWrapper);
+            if (requestBody != null && !requestBody.trim().isEmpty()) {
+                logMessage.append("  • Request Body:\n").append(toPrettyJson(requestBody)).append("\n");
+            } else {
+                logMessage.append("  • Request Body: null\n");
+            }
+
+            logMessage.append("[RESPONSE]\n");
+
+            // Response Body를 JSON으로 pretty print
+            String responseBody = getResponseBody(responseWrapper, request);
+            if (responseBody != null && !responseBody.trim().isEmpty()) {
+                logMessage.append("  • Response Body:\n").append(toPrettyJson(responseBody)).append("\n");
+            } else {
+                logMessage.append("  • Response Body: null\n");
+            }
+
+            logMessage.append("[RESULT]\n");
+            logMessage.append("  • status: ").append(responseWrapper.getStatus()).append("\n");
+            logMessage.append("  • process time: ").append(String.format("%.3fs", processTime));
+
+            log.info(logMessage.toString());
+
         } catch (Exception e) {
             log.error("HTTP Logging failed. (API: ({}) {})", request.getMethod(),
                 request.getRequestURI());
         } finally {
             responseWrapper.copyBodyToResponse();
+        }
+    }
+
+    /**
+     * JSON 문자열을 Pretty format으로 변환
+     *
+     * @param jsonString JSON 문자열 또는 일반 문자열
+     * @return Pretty formatted JSON 문자열
+     */
+    private String toPrettyJson(String jsonString) {
+        if (jsonString == null || jsonString.trim().isEmpty()) {
+            return "null";
+        }
+
+        try {
+            JsonNode jsonNode = prettyObjectMapper.readTree(jsonString);
+            return prettyObjectMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(jsonNode);
+        } catch (Exception e) {
+            return jsonString;
+        }
+    }
+
+    /**
+     * Map 객체를 Pretty JSON으로 변환
+     *
+     * @param map Map 객체
+     * @return Pretty formatted JSON 문자열
+     */
+    private String toPrettyJson(Map<String, String> map) {
+        try {
+            return prettyObjectMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return map.toString();
         }
     }
 
@@ -230,5 +299,4 @@ public class HttpReqResLoggingFilter extends OncePerRequestFilter {
         }
         return false;
     }
-
 }

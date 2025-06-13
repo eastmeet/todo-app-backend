@@ -59,6 +59,11 @@ public class TodoController {
 
     @GetMapping("/error")
     public ResponseEntity<Void> createRuntimeError() {
-        throw new RuntimeException("This is a test");
+        try {
+            throw new RuntimeException("This is a test");
+        } catch (RuntimeException e) {
+            log.error(e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 }
